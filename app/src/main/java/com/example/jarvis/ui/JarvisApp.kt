@@ -352,7 +352,9 @@ fun JarvisApp(
                                     SubScreen.VOICE_SETUP -> VoiceSetupScreen(
                                         currentSettings = settings,
                                         onUpdateSettings = { viewModel.repository.updateSettings(it) },
-                                        onTestWakeTrigger = { viewModel.triggerWakeSession() }
+                                        onTestWakeTrigger = { viewModel.triggerWakeSession() },
+                                        bridge = viewModel.bridge,
+                                        onBack = { viewModel.closeSubScreen() }
                                     )
                                     SubScreen.VOICE_SELECTION -> VoiceSelectionScreen(
                                         currentSettings = settings,

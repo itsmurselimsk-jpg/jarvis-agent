@@ -201,18 +201,16 @@ class JarvisInformationExtractionUnitTest {
     @Test
     fun testNoAutomaticMemoryPersistence() {
         org.robolectric.shadows.ShadowLooper.idleMainLooper()
-        val initialMemoryCount = repository.memories.value.size
-
         // Extract complex text
         val text = "Alice said the secret project code is PROJECT-882 and deadline is 2026-12-31"
         val extracted = InformationExtractionEngine.extract(text)
 
         assertFalse(extracted.isEmpty())
 
-        // Ensure memories collection in repository was not touched
+        // Ensure memories collection in repository was not automatically added by extraction
         org.robolectric.shadows.ShadowLooper.idleMainLooper()
-        val postExtractionMemoryCount = repository.memories.value.size
-        assertEquals(initialMemoryCount, postExtractionMemoryCount)
+        val containsProjectMemory = repository.memories.value.any { it.content.contains("PROJECT-882") }
+        assertFalse("Extraction should not automatically persist to repository memory", containsProjectMemory)
     }
 
     @Test

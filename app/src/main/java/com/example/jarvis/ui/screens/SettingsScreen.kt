@@ -318,6 +318,13 @@ fun SettingsScreen(
                     )
                 }
 
+                Text(
+                    text = "Wake detection is phrase-match after speech recognition, not a neural wake-word chip.",
+                    fontSize = 10.sp,
+                    color = JarvisTextSecondary,
+                    lineHeight = 14.sp
+                )
+
                 Button(
                     onClick = onNavigateVoiceSetup,
                     modifier = Modifier.fillMaxWidth(),

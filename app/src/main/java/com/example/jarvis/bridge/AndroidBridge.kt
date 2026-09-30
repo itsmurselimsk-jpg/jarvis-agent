@@ -156,9 +156,22 @@ class AndroidBridge(private val context: Context) {
                         override fun onReadyForSpeech(params: Bundle?) {
                             _isListening.value = true
                         }
-                        override fun onBeginningOfSpeech() {}
+                        override fun onBeginningOfSpeech() {
+                            // Immediate Voice Barge-In: Cancel active TTS as soon as user begins speaking
+                            if (_isSpeaking.value) {
+                                Log.d("AndroidBridge", "Voice Barge-In: onBeginningOfSpeech triggered -> cancelling active TTS immediately")
+                                stopSpeaking()
+                                onBargeInTriggered?.invoke()
+                            }
+                        }
                         override fun onRmsChanged(rmsdB: Float) {
                             _voiceRmsDb.value = (rmsdB.coerceIn(0f, 15f))
+                            // Voice Barge-In on acoustic energy onset during TTS
+                            if (_isSpeaking.value && rmsdB > 4.0f) {
+                                Log.d("AndroidBridge", "Voice Barge-In: onRmsChanged ($rmsdB dB) -> cancelling active TTS immediately")
+                                stopSpeaking()
+                                onBargeInTriggered?.invoke()
+                            }
                         }
                         override fun onBufferReceived(buffer: ByteArray?) {}
                         override fun onEndOfSpeech() {
@@ -193,6 +206,11 @@ class AndroidBridge(private val context: Context) {
                             }
                         }
                         override fun onPartialResults(partialResults: Bundle?) {
+                            if (_isSpeaking.value) {
+                                Log.d("AndroidBridge", "Voice Barge-In: onPartialResults -> cancelling active TTS immediately")
+                                stopSpeaking()
+                                onBargeInTriggered?.invoke()
+                            }
                             val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                             matches?.firstOrNull()?.let {
                                 _liveTranscript.value = it
@@ -384,23 +402,23 @@ class AndroidBridge(private val context: Context) {
         locale: Locale? = null,
         onDone: (() -> Unit)? = null
     ) {
-        if (!_isSpeakerEnabled.value) {
+        if (!_isSpeakerEnabled.value || text.isBlank()) {
             onDone?.invoke()
             return
         }
 
-        val settings = repository?.settings?.value
-        val profile = com.example.jarvis.voice.VoiceProfileType.fromName(settings?.voiceProfileName ?: "JARVIS Bettany")
+        // Cancel any currently playing TTS to strictly prevent overlapping playback
+        stopDeviceTts()
 
-        com.example.jarvis.voice.HumanVoiceEngine.speak(
-            context = context,
-            text = text,
-            speechRate = speechRate,
-            pitch = pitch,
+        val settings = repository?.settings?.value
+        val effectiveRate = speechRate * (settings?.speechRate ?: 1.0f)
+        val effectivePitch = pitch * (settings?.speechPitch ?: 1.0f)
+
+        speakDeviceNeural(
+            sanitizedText = text,
+            speechRate = effectiveRate,
+            pitch = effectivePitch,
             locale = locale,
-            voiceProfile = profile,
-            settings = settings,
-            bridge = this,
             onDone = onDone
         )
     }
@@ -523,7 +541,6 @@ class AndroidBridge(private val context: Context) {
 
     fun stopSpeaking() {
         bargeInDetector?.stopMonitoring()
-        com.example.jarvis.voice.HumanVoiceEngine.stop(this)
         stopDeviceTts()
     }
 

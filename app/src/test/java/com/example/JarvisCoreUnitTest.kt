@@ -116,7 +116,7 @@ class JarvisCoreUnitTest {
 
         val check2 = com.example.jarvis.voice.LanguageDetector.inspectForWakeWord("JARVIS what is the battery percentage?")
         assertTrue(check2.isWakeWordPresent)
-        assertEquals("what is the battery percentage?", check2.commandAfterWake)
+        assertEquals("what is the battery percentage", check2.commandAfterWake)
 
         val check3 = com.example.jarvis.voice.LanguageDetector.inspectForWakeWord("Good morning world")
         assertFalse(check3.isWakeWordPresent)

@@ -68,41 +68,13 @@ object LanguageDetector {
     )
 
     fun inspectForWakeWord(rawText: String): WakeWordCheck {
-        val trimmed = rawText.trim()
-        val lang = detectLanguage(trimmed)
-
-        for (pattern in wakePatterns) {
-            val match = pattern.find(trimmed)
-            if (match != null) {
-                val after = trimmed.substring(match.range.last + 1).trim()
-                    .removePrefix(",").removePrefix(".").trim()
-                return WakeWordCheck(
-                    isWakeWordPresent = true,
-                    commandAfterWake = after,
-                    language = lang
-                )
-            }
-        }
-
-        // Also check if text contains "jarvis" or "strix" in phonetic roman script
-        val lower = trimmed.lowercase()
-        val targetWake = when {
-            lower.contains("strix") -> "strix"
-            lower.contains("jarvis") -> "jarvis"
-            else -> null
-        }
-        if (targetWake != null) {
-            val idx = lower.indexOf(targetWake)
-            val after = trimmed.substring(idx + targetWake.length).trim()
-                .removePrefix(",").removePrefix(".").trim()
-            return WakeWordCheck(
-                isWakeWordPresent = true,
-                commandAfterWake = after,
-                language = lang
-            )
-        }
-
-        return WakeWordCheck(isWakeWordPresent = false)
+        val lang = detectLanguage(rawText)
+        val matchResult = JarvisWakePhraseMatcher.match(rawText)
+        return WakeWordCheck(
+            isWakeWordPresent = matchResult.isMatched,
+            commandAfterWake = matchResult.commandAfterWake,
+            language = lang
+        )
     }
 
     /**
