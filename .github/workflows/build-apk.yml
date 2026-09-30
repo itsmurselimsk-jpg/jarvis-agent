@@ -1,4 +1,4 @@
-name: Build & Release Strix APK
+name: Build & Release JARVIS APK
 
 on:
   push:
@@ -49,13 +49,13 @@ jobs:
       - name: Rename APK for Easy Identification
         run: |
           mkdir -p release-output
-          cp app/build/outputs/apk/debug/app-debug.apk release-output/Strix-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-output/JARVIS-debug.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Strix-debug-apk
-          path: release-output/Strix-debug.apk
+          name: JARVIS-debug-apk
+          path: release-output/JARVIS-debug.apk
           retention-days: 30
 
       - name: Create GitHub Release with APK
@@ -64,14 +64,14 @@ jobs:
         continue-on-error: true
         with:
           tag_name: v1.1.${{ github.run_number }}
-          name: "Strix AI v1.1.${{ github.run_number }}"
+          name: "JARVIS AI v1.1.${{ github.run_number }}"
           body: |
-            ## 🦅 Strix AI Assistant - Latest Build
+            ## ⚡ JARVIS AI Assistant - Latest Build
             
             Automatic build triggered from commit `${{ github.sha }}`.
             
             ### 📥 Download:
-            Download the `Strix-debug.apk` asset below and install directly on your Android device!
-          files: release-output/Strix-debug.apk
+            Download the `JARVIS-debug.apk` asset below and install directly on your Android device!
+          files: release-output/JARVIS-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

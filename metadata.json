@@ -1,6 +1,6 @@
 {
-  "name": "Strix",
-  "description": "Futuristic personal AI operating layer with voice interface, agentic brain, tool execution, and device telemetry.",
+  "name": "JARVIS",
+  "description": "Futuristic JARVIS AI operating layer with voice interface, holographic core, autonomous brain, tool execution, and device telemetry.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
