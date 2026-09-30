@@ -56,7 +56,8 @@ enum class SubScreen {
     CODE_STUDIO,
     VOICE_NOTES,
     TIMER_STOPWATCH,
-    BACKUP_EXPORT
+    BACKUP_EXPORT,
+    PERMISSION_ONBOARDING
 }
 
 class JarvisViewModel(application: Application) : AndroidViewModel(application) {

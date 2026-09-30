@@ -132,6 +132,21 @@ fun JarvisApp(
         }
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE) }
+    var hasCompletedOnboarding by remember {
+        mutableStateOf(prefs.getBoolean("permission_onboarding_completed", false))
+    }
+
+    if (!hasCompletedOnboarding) {
+        com.example.jarvis.ui.screens.PermissionOnboardingScreen(
+            onComplete = {
+                hasCompletedOnboarding = true
+            }
+        )
+        return
+    }
+
     // Direct Access - Instant Launch into JARVIS HUD without Login Barrier
     BackHandler(enabled = drawerState.isOpen || activeSubScreen != null || currentTab != NavTab.HOME) {
                 if (drawerState.isOpen) {
@@ -393,6 +408,9 @@ fun JarvisApp(
                                     SubScreen.BACKUP_EXPORT -> com.example.jarvis.ui.screens.DataBackupScreen(
                                         repository = viewModel.repository,
                                         onBack = { viewModel.closeSubScreen() }
+                                    )
+                                    SubScreen.PERMISSION_ONBOARDING -> com.example.jarvis.ui.screens.PermissionOnboardingScreen(
+                                        onComplete = { viewModel.closeSubScreen() }
                                     )
                                     SubScreen.VOICE -> {}
                                 }
