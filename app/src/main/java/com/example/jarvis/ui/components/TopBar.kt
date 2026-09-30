@@ -88,10 +88,10 @@ fun TopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Official STRIX Emblem Badge
+                // Official JARVIS Emblem Badge
                 Image(
-                    painter = painterResource(id = R.drawable.strix_logo),
-                    contentDescription = "STRIX Logo",
+                    painter = painterResource(id = R.drawable.jarvis_logo),
+                    contentDescription = "JARVIS Logo",
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
@@ -108,7 +108,7 @@ fun TopBar(
                 )
 
                 Text(
-                    text = "S.T.R.I.X.",
+                    text = "J.A.R.V.I.S.",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.Monospace,

@@ -274,7 +274,7 @@ fun HomeScreen(
                         Box(contentAlignment = Alignment.Center) {
                             // Deep background glow shadow (Layer 1)
                             Text(
-                                text = "STRIX",
+                                text = "JARVIS",
                                 fontSize = 34.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace,
@@ -285,7 +285,7 @@ fun HomeScreen(
 
                             // Foreground crisp 3D holographic title (Layer 2)
                             Text(
-                                text = "STRIX",
+                                text = "JARVIS",
                                 fontSize = 34.sp,
                                 fontWeight = FontWeight.Black,
                                 fontFamily = FontFamily.Monospace,
@@ -403,7 +403,7 @@ fun HomeScreen(
                             onValueChange = { quickInputText = it },
                             placeholder = {
                                 Text(
-                                    "Ask STRIX or give a command...",
+                                    "Ask JARVIS or give a command...",
                                     fontSize = 13.sp,
                                     color = JarvisTextDim
                                 )

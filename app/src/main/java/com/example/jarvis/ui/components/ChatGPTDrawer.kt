@@ -95,15 +95,15 @@ fun ChatGPTDrawer(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.strix_logo),
-                        contentDescription = "STRIX Logo",
+                        painter = painterResource(id = R.drawable.jarvis_logo),
+                        contentDescription = "JARVIS Logo",
                         modifier = Modifier
                             .size(24.dp)
                             .clip(CircleShape)
                             .border(1.dp, JarvisCyan.copy(alpha = 0.5f), CircleShape)
                     )
                     Text(
-                        text = "STRIX",
+                        text = "JARVIS",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace,

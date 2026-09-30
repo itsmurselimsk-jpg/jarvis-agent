@@ -367,14 +367,14 @@ fun AccountProfileScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Official STRIX Emblem Brand Signature
+        // Official JARVIS Emblem Brand Signature
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Image(
-                painter = painterResource(id = R.drawable.strix_logo),
-                contentDescription = "Official STRIX Logo",
+                painter = painterResource(id = R.drawable.jarvis_logo),
+                contentDescription = "Official JARVIS Logo",
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
@@ -383,7 +383,7 @@ fun AccountProfileScreen(
             )
             Column {
                 Text(
-                    text = "STRIX NEURAL CORE v2.4.0",
+                    text = "JARVIS NEURAL CORE v2.4.0",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,

@@ -67,7 +67,7 @@ fun AboutScreen() {
     ) {
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Official STRIX Emblem
+        // Official JARVIS Emblem
         Box(
             modifier = Modifier
                 .size(190.dp)
@@ -77,8 +77,8 @@ fun AboutScreen() {
             contentAlignment = Alignment.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.strix_logo),
-                contentDescription = "Official STRIX Logo",
+                painter = painterResource(id = R.drawable.jarvis_logo),
+                contentDescription = "Official JARVIS Logo",
                 modifier = Modifier
                     .size(190.dp)
                     .clip(CircleShape),
