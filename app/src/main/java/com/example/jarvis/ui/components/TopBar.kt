@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jarvis.ui.theme.JarvisAmber
 import com.example.jarvis.model.DeviceTelemetry
 import com.example.jarvis.ui.theme.JarvisBackground
 import com.example.jarvis.ui.theme.JarvisBorder
@@ -119,16 +120,16 @@ fun TopBar(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFF0D1B2A))
-                        .border(0.5.dp, JarvisBorderSubtle, RoundedCornerShape(4.dp))
+                        .background(if (isOnline) Color(0xFF0D1B2A) else Color(0x33FFA000))
+                        .border(0.5.dp, if (isOnline) JarvisBorderSubtle else JarvisAmber, RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (isOnline) "ONLINE" else "STANDBY",
+                        text = if (isOnline) "ONLINE" else "OFFLINE // LOCAL TOOLS",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = if (isOnline) JarvisGreen else JarvisTextDim
+                        color = if (isOnline) JarvisGreen else JarvisAmber
                     )
                 }
             }

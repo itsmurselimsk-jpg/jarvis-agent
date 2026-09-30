@@ -71,6 +71,10 @@ class JarvisViewModel(application: Application) : AndroidViewModel(application) 
     val authManager = AuthManager(application)
     val authState = authManager.authState
 
+    val offlineModeManager = com.example.jarvis.network.OfflineModeManager(application)
+    val isOnline = offlineModeManager.isOnline
+    val networkType = offlineModeManager.networkType
+
     private val _safetyRequest = MutableStateFlow<SafetyRequest?>(null)
     val safetyRequest: StateFlow<SafetyRequest?> = _safetyRequest.asStateFlow()
 

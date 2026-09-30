@@ -72,6 +72,7 @@ class JarvisVoiceService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var wakeLock: PowerManager.WakeLock? = null
     private var wakeEngine: ContinuousWakeEngine? = null
+    private var lowPowerWakeDetector: com.example.jarvis.voice.LowPowerWakeWordDetector? = null
     private var overlayHud: JarvisOverlayHud? = null
     private var smartBatteryMonitor: SmartBatteryMonitor? = null
 
@@ -97,6 +98,20 @@ class JarvisVoiceService : Service() {
         acquireWakeLock()
         createNotificationChannel()
         initWakeEngine()
+
+        // Low-Power Acoustic Wake Word System
+        lowPowerWakeDetector = com.example.jarvis.voice.LowPowerWakeWordDetector(
+            context = applicationContext,
+            onSpeechOnsetDetected = {
+                // Vocal acoustic energy detected! Activate recognizer burst
+                wakeEngine?.enterActiveCommandListening()
+            },
+            onWakeWordConfirmed = {
+                triggerWakeSession(com.example.jarvis.voice.LanguageDetector.WakeWordCheck(isWakeWordPresent = true))
+            }
+        ).apply {
+            start()
+        }
 
         // Smart Battery & Power Alerts
         smartBatteryMonitor = SmartBatteryMonitor(
@@ -350,6 +365,7 @@ class JarvisVoiceService : Service() {
         super.onDestroy()
         _isServiceRunning.value = false
         smartBatteryMonitor?.stopMonitoring()
+        lowPowerWakeDetector?.stop()
         wakeEngine?.stop()
         overlayHud?.hide()
         bridge.destroy()

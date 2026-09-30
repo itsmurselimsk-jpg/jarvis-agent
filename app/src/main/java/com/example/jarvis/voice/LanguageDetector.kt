@@ -60,11 +60,11 @@ object LanguageDetector {
 
     private val wakePatterns = listOf(
         // English
-        Regex("""(?i)\b(hey jarvis|ok jarvis|okay jarvis|hello jarvis|jarvis)\b"""),
+        Regex("""(?i)\b(hey jarvis|ok jarvis|okay jarvis|hello jarvis|jarvis|hey strix|ok strix|okay strix|hello strix|strix)\b"""),
         // Bengali
-        Regex("""(?i)\b(জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস)\b"""),
+        Regex("""(?i)\b(জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস|স্ট্রিপ্স|হে স্ট্রিক্স)\b"""),
         // Hindi
-        Regex("""(?i)\b(जार्विस|हे जार्विस|जार्विस)\b""")
+        Regex("""(?i)\b(जार्विस|हे जार्विस|जार्विस|स्ट्रिक्स|हे स्ट्रिक्स)\b""")
     )
 
     fun inspectForWakeWord(rawText: String): WakeWordCheck {
@@ -84,11 +84,16 @@ object LanguageDetector {
             }
         }
 
-        // Also check if text contains "jarvis" in phonetic roman script
+        // Also check if text contains "jarvis" or "strix" in phonetic roman script
         val lower = trimmed.lowercase()
-        if (lower.contains("jarvis")) {
-            val idx = lower.indexOf("jarvis")
-            val after = trimmed.substring(idx + 6).trim()
+        val targetWake = when {
+            lower.contains("strix") -> "strix"
+            lower.contains("jarvis") -> "jarvis"
+            else -> null
+        }
+        if (targetWake != null) {
+            val idx = lower.indexOf(targetWake)
+            val after = trimmed.substring(idx + targetWake.length).trim()
                 .removePrefix(",").removePrefix(".").trim()
             return WakeWordCheck(
                 isWakeWordPresent = true,
