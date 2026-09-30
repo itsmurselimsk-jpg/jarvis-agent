@@ -74,12 +74,16 @@ class AgentBrain(
 
     val pluginManager = com.example.jarvis.plugin.PluginManager(bridge.getApplicationContext(), repository)
 
+    val longTermRAGEngine = com.example.jarvis.memory.LongTermRAGEngine(repository)
+    val proactiveEngine = com.example.jarvis.proactive.ProactiveAssistantEngine(bridge.getApplicationContext(), repository, bridge)
+
     val automationOrchestrator: com.example.jarvis.automation.AutomationOrchestrator by lazy {
         com.example.jarvis.automation.AutomationOrchestrator(repository, bridge, this)
     }
 
     init {
         // Register all real Android tools
+        registry.register(com.example.jarvis.brain.tools.ScreenClickTool())
         registry.register(BatteryTool())
         registry.register(NetworkStatusTool())
         registry.register(WifiTool())
@@ -281,6 +285,48 @@ class AgentBrain(
             // 1b. Intent Classification & Language Style
             val intentResult = com.example.jarvis.intent.IntentClassifier.classify(input)
             val langStyle = com.example.jarvis.personality.JarvisPersonality.detectLanguageStyle(input)
+            val isHindi = langStyle == com.example.jarvis.personality.LanguageStyle.HINDI || langStyle == com.example.jarvis.personality.LanguageStyle.HINGLISH
+
+            // Check explicit memory command (Remember that..., Forget my...)
+            val memoryResult = longTermRAGEngine.processExplicitMemoryCommands(input)
+            when (memoryResult) {
+                is com.example.jarvis.memory.LongTermRAGEngine.MemoryCommandResult.Remembered -> {
+                    val resp = if (isHindi) {
+                        "Sir, maine ye memory mein store kar liya hai: '${memoryResult.fact}'"
+                    } else {
+                        "Acknowledged, Sir. I have committed this to long-term memory: '${memoryResult.fact}'"
+                    }
+                    repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = resp))
+                    deliverFinalResponse(resp, onSpeaking, onIdle)
+                    return@launch
+                }
+                is com.example.jarvis.memory.LongTermRAGEngine.MemoryCommandResult.Forgotten -> {
+                    val resp = if (isHindi) {
+                        "Sir, '${memoryResult.target}' se judi ${memoryResult.deletedCount} memories delete kar di gayi hain."
+                    } else {
+                        "Sir, ${memoryResult.deletedCount} memory records matching '${memoryResult.target}' have been purged."
+                    }
+                    repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = resp))
+                    deliverFinalResponse(resp, onSpeaking, onIdle)
+                    return@launch
+                }
+                com.example.jarvis.memory.LongTermRAGEngine.MemoryCommandResult.NotACommand -> {}
+            }
+
+            // Check Proactive Briefing command
+            val lowerInput = input.lowercase().trim()
+            if (lowerInput.contains("morning briefing") || lowerInput.contains("executive briefing") || lowerInput.contains("subah ki report") || lowerInput.contains("aaj ka din")) {
+                val briefing = proactiveEngine.generateMorningBriefing(isHindi)
+                repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = briefing))
+                deliverFinalResponse(briefing, onSpeaking, onIdle)
+                return@launch
+            }
+            if (lowerInput.contains("daily recap") || lowerInput.contains("evening report") || lowerInput.contains("aaj ka recap")) {
+                val recap = proactiveEngine.generateDailyRecap(isHindi)
+                repository.addMessage(ChatMessage(sender = MessageSender.JARVIS, text = recap))
+                deliverFinalResponse(recap, onSpeaking, onIdle)
+                return@launch
+            }
 
             // Check and execute compound multi-step task if detected
             if (com.example.jarvis.brain.CompoundTaskPlanner.isCompoundQuery(input)) {
