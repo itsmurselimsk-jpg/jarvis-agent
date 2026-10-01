@@ -11,7 +11,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Autonomous Proactive Assistant Engine for JARVIS / Strix.
+ * Autonomous Proactive Assistant Engine for JARVIS.
  * Generates proactive executive briefings, battery warnings, and notification digests.
  */
 class ProactiveAssistantEngine(

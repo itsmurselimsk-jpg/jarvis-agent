@@ -99,7 +99,7 @@ data class PermissionProtocol(
 )
 
 /**
- * Beautiful, first-launch Permission Onboarding Screen for JARVIS / Strix.
+ * Beautiful, first-launch Permission Onboarding Screen for JARVIS.
  * Transparently articulates why each capability is requested, with real-time
  * lifecycle detection, glowing indicators, and seamless settings dispatch.
  */

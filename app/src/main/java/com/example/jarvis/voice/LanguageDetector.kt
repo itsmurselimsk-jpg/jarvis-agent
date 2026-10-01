@@ -60,11 +60,11 @@ object LanguageDetector {
 
     private val wakePatterns = listOf(
         // English
-        Regex("""(?i)\b(hey jarvis|ok jarvis|okay jarvis|hello jarvis|jarvis|hey strix|ok strix|okay strix|hello strix|strix)\b"""),
+        Regex("""(?i)\b(hey jarvis|ok jarvis|okay jarvis|hello jarvis|jarvis)\b"""),
         // Bengali
-        Regex("""(?i)\b(জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস|স্ট্রিপ্স|হে স্ট্রিক্স)\b"""),
+        Regex("""(?i)\b(জারভিস|হে জারভিস|ওহে জারভিস|জার্ভিস)\b"""),
         // Hindi
-        Regex("""(?i)\b(जार्विस|हे जार्विस|जार्विस|स्ट्रिक्स|हे स्ट्रिक्स)\b""")
+        Regex("""(?i)\b(जार्विस|हे जार्विस|ओके जार्विस)\b""")
     )
 
     fun inspectForWakeWord(rawText: String): WakeWordCheck {

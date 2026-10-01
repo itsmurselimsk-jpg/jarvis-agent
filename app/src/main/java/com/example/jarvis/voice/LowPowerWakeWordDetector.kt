@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  *  - Stage 1: Ultra-lightweight PCM Acoustic VAD (<0.5% CPU). Filters out ambient silence
  *             and white noise before triggering any NLP / speech recognition.
  *  - Stage 2: Keyword burst trigger when vocal energy and zero-crossing frequencies match
- *             human speech phonetics ("Hey Strix" / "Jarvis").
+ *             human speech phonetics ("Hey Jarvis" / "Jarvis").
  *
  * Includes battery-aware adaptive duty cycling (throttles when battery is low).
  */
