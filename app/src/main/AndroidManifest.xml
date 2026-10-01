@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
@@ -21,6 +23,7 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- QUERY_ALL_PACKAGES justification: Required by AppLauncherTool and intent dispatchers to query and launch installed applications requested by user prompts. -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -72,7 +75,7 @@
 
         <!-- Accessibility Service Foundation -->
         <service
-            android:name=".jarvis.accessibility.JarvisAccessibilityService"
+            android:name="com.jarvis.ai.accessibility.JarvisAccessibilityService"
             android:exported="true"
             android:label="JARVIS Accessibility Service"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
@@ -86,7 +89,7 @@
 
         <!-- Notification Listener Service -->
         <service
-            android:name=".jarvis.notification.JarvisNotificationListenerService"
+            android:name="com.jarvis.ai.notification.JarvisNotificationListenerService"
             android:exported="true"
             android:label="JARVIS Notification Intelligence"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -97,12 +100,12 @@
 
         <!-- Alarm and Reminder Receiver -->
         <receiver
-            android:name=".jarvis.tasks.JarvisAlarmReceiver"
+            android:name="com.jarvis.ai.tasks.JarvisAlarmReceiver"
             android:exported="false" />
 
         <!-- Boot Completed Receiver for Task Rescheduling -->
         <receiver
-            android:name=".jarvis.tasks.JarvisBootReceiver"
+            android:name="com.jarvis.ai.tasks.JarvisBootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -112,13 +115,13 @@
 
         <!-- Continuous Voice Foreground Service -->
         <service
-            android:name=".jarvis.service.JarvisVoiceService"
+            android:name="com.jarvis.ai.service.JarvisVoiceService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
         <!-- Floating Holographic Arc Reactor Orb Service -->
         <service
-            android:name=".jarvis.overlay.FloatingArcOrbService"
+            android:name="com.jarvis.ai.overlay.FloatingArcOrbService"
             android:exported="false" />
     </application>
 
