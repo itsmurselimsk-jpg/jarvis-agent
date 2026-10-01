@@ -70,7 +70,7 @@ class GeminiAIProvider(
         } else {
             "gemini-2.5-flash"
         }
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$effectiveApiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:streamGenerateContent?alt=sse&key=$effectiveApiKey"
 
         val rootJson = JSONObject()
         val contentsArray = JSONArray()
@@ -92,22 +92,45 @@ class GeminiAIProvider(
         val request = Request.Builder().url(url).post(requestBody).build()
 
         val response = httpClient.newCall(request).execute()
-        val responseBody = response.body?.string() ?: ""
-
         if (!response.isSuccessful) {
-            throw Exception("Gemini API error (HTTP ${response.code}): $responseBody")
+            val errorBody = response.body?.string() ?: ""
+            throw Exception("Gemini API error (HTTP ${response.code}): $errorBody")
         }
 
-        val parsed = JSONObject(responseBody)
-        val fullText = parsed.optJSONArray("candidates")
-            ?.optJSONObject(0)
-            ?.optJSONObject("content")
-            ?.optJSONArray("parts")
-            ?.optJSONObject(0)
-            ?.optString("text") ?: "JARVIS: No output generated."
+        val fullTextBuilder = StringBuilder()
+        val reader = response.body?.byteStream()?.bufferedReader()
+        var line = reader?.readLine()
+        while (line != null) {
+            if (line.startsWith("data: ")) {
+                val dataJson = line.removePrefix("data: ").trim()
+                if (dataJson.isNotBlank() && dataJson != "[DONE]") {
+                    try {
+                        val parsed = JSONObject(dataJson)
+                        val textChunk = parsed.optJSONArray("candidates")
+                            ?.optJSONObject(0)
+                            ?.optJSONObject("content")
+                            ?.optJSONArray("parts")
+                            ?.optJSONObject(0)
+                            ?.optString("text")
+                        if (!textChunk.isNullOrBlank()) {
+                            fullTextBuilder.append(textChunk)
+                            onChunkReceived(fullTextBuilder.toString())
+                        }
+                    } catch (_: Exception) {
+                        // Ignore malformed partial chunks
+                    }
+                }
+            }
+            line = reader?.readLine()
+        }
 
-        simulateStream(fullText, onChunkReceived)
-        return@withContext fullText
+        val result = fullTextBuilder.toString()
+        if (result.isBlank()) {
+            val fallback = "JARVIS: Operation acknowledged."
+            onChunkReceived(fallback)
+            return@withContext fallback
+        }
+        return@withContext result
     }
 
     override suspend fun decideTool(
@@ -123,37 +146,48 @@ class GeminiAIProvider(
         }
 
         try {
-            val toolsCatalog = availableTools.joinToString("\n") { "• ${it.first}: ${it.second}" }
-            val planningPrompt = """
-                You are the JARVIS Executive Tool Planner.
-                Given the user's input and the registered tool catalogue, decide if a tool should be executed.
-                
-                REGISTERED TOOLS:
-                $toolsCatalog
-                
-                USER INPUT: "$userInput"
-                
-                Respond ONLY in strict JSON format:
-                {
-                  "useTool": true | false,
-                  "toolName": "<Exact tool name from list or null>",
-                  "toolInput": "<Refined argument or query to pass into tool>",
-                  "reasoning": "<Short explanation>"
-                }
-            """.trimIndent()
-
             val model = "gemini-2.5-flash"
             val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$effectiveApiKey"
 
             val rootJson = JSONObject()
             val contentsArray = JSONArray()
-            val partsArray = JSONArray().apply { put(JSONObject().put("text", planningPrompt)) }
+            val promptText = buildString {
+                appendLine("You are the JARVIS Autonomous Operating System executive planner.")
+                if (contextHistory.isNotBlank()) {
+                    appendLine("CONTEXT:\n$contextHistory")
+                }
+                appendLine("USER DIRECTIVE: \"$userInput\"")
+                appendLine("Determine if any registered tool should be called to fulfill this directive.")
+            }
+            val partsArray = JSONArray().apply { put(JSONObject().put("text", promptText)) }
             contentsArray.put(JSONObject().put("parts", partsArray))
             rootJson.put("contents", contentsArray)
 
-            // Generation config requesting JSON
-            val genConfig = JSONObject().put("responseMimeType", "application/json")
-            rootJson.put("generationConfig", genConfig)
+            // Native Gemini Tool Declarations
+            val functionDeclarations = JSONArray()
+            for ((toolName, toolDesc) in availableTools) {
+                val funcObj = JSONObject()
+                funcObj.put("name", toolName)
+                funcObj.put("description", toolDesc)
+                val paramsObj = JSONObject().apply {
+                    put("type", "OBJECT")
+                    val propsObj = JSONObject().apply {
+                        put("input", JSONObject().apply {
+                            put("type", "STRING")
+                            put("description", "Direct parameters, target query, or values for $toolName")
+                        })
+                    }
+                    put("properties", propsObj)
+                    put("required", JSONArray().apply { put("input") })
+                }
+                funcObj.put("parameters", paramsObj)
+                functionDeclarations.put(funcObj)
+            }
+
+            val toolsArray = JSONArray().apply {
+                put(JSONObject().put("functionDeclarations", functionDeclarations))
+            }
+            rootJson.put("tools", toolsArray)
 
             val requestBody = rootJson.toString().toRequestBody("application/json".toMediaType())
             val request = Request.Builder().url(url).post(requestBody).build()
@@ -166,15 +200,33 @@ class GeminiAIProvider(
             }
 
             val parsed = JSONObject(body)
-            val jsonText = parsed.optJSONArray("candidates")
+            val candidateParts = parsed.optJSONArray("candidates")
                 ?.optJSONObject(0)
                 ?.optJSONObject("content")
                 ?.optJSONArray("parts")
-                ?.optJSONObject(0)
-                ?.optString("text") ?: ""
 
+            if (candidateParts != null && candidateParts.length() > 0) {
+                for (i in 0 until candidateParts.length()) {
+                    val part = candidateParts.optJSONObject(i)
+                    val functionCall = part?.optJSONObject("functionCall")
+                    if (functionCall != null) {
+                        val toolName = functionCall.optString("name")
+                        val argsObj = functionCall.optJSONObject("args")
+                        val toolInput = argsObj?.optString("input") ?: userInput
+                        return@withContext ToolDecision(
+                            useTool = true,
+                            toolName = toolName,
+                            toolInput = toolInput,
+                            reasoning = "Gemini native function calling selected $toolName"
+                        )
+                    }
+                }
+            }
+
+            // Fallback response repair if raw JSON was returned in text part
+            val jsonText = candidateParts?.optJSONObject(0)?.optString("text") ?: ""
             val repairedDecision = com.example.jarvis.recovery.ResponseRepair.parseToolDecisionWithRepair(jsonText, userInput)
-            repairedDecision ?: LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
+            repairedDecision ?: ToolDecision(useTool = false, toolName = null, toolInput = userInput, reasoning = "Conversational response")
         } catch (_: Exception) {
             LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
         }
@@ -304,9 +356,98 @@ class OpenAiCompatibleAIProvider(
         userInput: String,
         availableTools: List<Pair<String, String>>,
         contextHistory: String
-    ): ToolDecision {
-        // Fallback or use local planning for ultra-reliable latency
-        return LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
+    ): ToolDecision = withContext(Dispatchers.IO) {
+        val settings = repository.settings.value
+        val endpoint = settings.customEndpoint.ifBlank { "https://api.openai.com/v1" }
+        val cleanEndpoint = if (endpoint.endsWith("/")) endpoint.dropLast(1) else endpoint
+        val url = "$cleanEndpoint/chat/completions"
+
+        if (settings.customApiKey.isBlank()) {
+            return@withContext LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
+        }
+
+        try {
+            val rootJson = JSONObject()
+            rootJson.put("model", settings.selectedModel.ifBlank { "gpt-4o-mini" })
+            val messages = JSONArray()
+            val systemMsg = "You are the JARVIS Executive Tool Planner. Determine which tool to call based on the user's input."
+            messages.put(JSONObject().apply {
+                put("role", "system")
+                put("content", systemMsg)
+            })
+            messages.put(JSONObject().apply {
+                put("role", "user")
+                put("content", if (contextHistory.isNotBlank()) "Context:\n$contextHistory\n\nUser: $userInput" else userInput)
+            })
+            rootJson.put("messages", messages)
+
+            val toolsArray = JSONArray()
+            for ((toolName, toolDesc) in availableTools) {
+                val toolObj = JSONObject()
+                toolObj.put("type", "function")
+                val funcObj = JSONObject()
+                funcObj.put("name", toolName)
+                funcObj.put("description", toolDesc)
+                funcObj.put("parameters", JSONObject().apply {
+                    put("type", "object")
+                    put("properties", JSONObject().apply {
+                        put("input", JSONObject().apply {
+                            put("type", "string")
+                            put("description", "Parameters or action arguments for $toolName")
+                        })
+                    })
+                    put("required", JSONArray().apply { put("input") })
+                })
+                toolObj.put("function", funcObj)
+                toolsArray.put(toolObj)
+            }
+            rootJson.put("tools", toolsArray)
+            rootJson.put("tool_choice", "auto")
+
+            val requestBody = rootJson.toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder()
+                .url(url)
+                .addHeader("Authorization", "Bearer ${settings.customApiKey}")
+                .post(requestBody)
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            val bodyString = response.body?.string() ?: ""
+
+            if (!response.isSuccessful) {
+                return@withContext LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
+            }
+
+            val parsed = JSONObject(bodyString)
+            val choice = parsed.optJSONArray("choices")?.optJSONObject(0)
+            val message = choice?.optJSONObject("message")
+            val toolCalls = message?.optJSONArray("tool_calls")
+
+            if (toolCalls != null && toolCalls.length() > 0) {
+                val firstCall = toolCalls.getJSONObject(0)
+                val func = firstCall.optJSONObject("function")
+                val toolName = func?.optString("name")
+                val argsStr = func?.optString("arguments") ?: ""
+                val toolInput = try {
+                    JSONObject(argsStr).optString("input", userInput)
+                } catch (_: Exception) {
+                    userInput
+                }
+                if (!toolName.isNullOrBlank()) {
+                    return@withContext ToolDecision(
+                        useTool = true,
+                        toolName = toolName,
+                        toolInput = toolInput,
+                        reasoning = "OpenAI native tool call: $toolName"
+                    )
+                }
+            }
+
+            // Conversational intent detected
+            ToolDecision(useTool = false, toolName = null, toolInput = userInput, reasoning = "Conversational response")
+        } catch (_: Exception) {
+            LocalNeuralBrainProvider.decideToolLocal(userInput, availableTools)
+        }
     }
 
     override suspend fun analyzeImage(prompt: String, bitmap: Bitmap): String {

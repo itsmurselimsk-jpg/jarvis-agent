@@ -63,7 +63,7 @@ class AgentBrain(
 
     // Short-term conversation context buffer: stores last N turns without sending entire history to provider
     private val conversationBuffer = mutableListOf<Pair<String, String>>()
-    private val maxBufferTurns = 4
+    val maxBufferTurns = 24
 
     // Recent tool execution tracking
     private var lastExecutedToolName: String? = null
@@ -367,9 +367,10 @@ class AgentBrain(
 
             // 2. Memory Retrieval with Recall Gating & Knowledge Graph
             val relevantMemories = if (com.example.jarvis.memory.RecallGatingEngine.shouldRecall(input, conversationBuffer)) {
-                val dbMem = retrieveRelevantMemories(input)
+                val ragMemories = longTermRAGEngine.retrieveRelevantMemories(input, topK = 3)
                 val graphDigest = com.example.jarvis.memory.KnowledgeGraphEngine.getRelevantKnowledgeDigest(input)
-                listOfNotNull(dbMem.takeIf { it.isNotBlank() }, graphDigest).joinToString("\n\n")
+                val combined = listOfNotNull(ragMemories.takeIf { it.isNotBlank() }, graphDigest?.takeIf { it.isNotBlank() }).joinToString("\n\n")
+                com.example.jarvis.security.PrivacyRedactionGuard.redact(combined)
             } else {
                 ""
             }
@@ -616,10 +617,41 @@ class AgentBrain(
         deliverFinalResponse(verifiedOutput, onSpeaking, onIdle)
     }
 
-    private fun recordTurn(userInput: String, assistantOutput: String) {
+    fun recordTurn(userInput: String, assistantOutput: String) {
         conversationBuffer.add(Pair(userInput, assistantOutput))
-        while (conversationBuffer.size > maxBufferTurns) {
-            conversationBuffer.removeAt(0)
+        if (conversationBuffer.size > maxBufferTurns) {
+            val overflowed = mutableListOf<Pair<String, String>>()
+            while (conversationBuffer.size > maxBufferTurns) {
+                overflowed.add(conversationBuffer.removeAt(0))
+            }
+            if (overflowed.isNotEmpty()) {
+                scope.launch {
+                    compactSessionSummary(overflowed)
+                }
+            }
+        }
+    }
+
+    suspend fun compactSessionSummary(overflowTurns: List<Pair<String, String>>) {
+        if (overflowTurns.isEmpty()) return
+        val summarySnippet = overflowTurns.joinToString("; ") { (user, jarvis) ->
+            "User: ${user.take(45)} -> JARVIS: ${jarvis.take(45)}"
+        }
+        val existing = repository.memories.value.find { it.category == "session_summary" }
+        if (existing != null) {
+            val updatedContent = (existing.content + " | " + summarySnippet).takeLast(800)
+            repository.deleteMemory(existing.id)
+            repository.addMemory(
+                title = "Active Session Summary",
+                content = updatedContent,
+                category = "session_summary"
+            )
+        } else {
+            repository.addMemory(
+                title = "Active Session Summary",
+                content = summarySnippet.take(600),
+                category = "session_summary"
+            )
         }
     }
 

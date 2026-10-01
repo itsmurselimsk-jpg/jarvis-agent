@@ -93,9 +93,9 @@ class GoogleServicesPlugin : ConnectedServiceAdapter(
                 success = false,
                 error = PluginError(
                     code = PluginErrorCode.AUTH_ERROR,
-                    message = "Google Workspace account credentials or OAuth token missing. Please configure credentials in Connected Services settings."
+                    message = "Google Services disconnected. Please connect your Google account in Settings to enable Calendar and Gmail actions."
                 ),
-                rawOutput = "Authentication failure: Missing Google OAuth credentials."
+                rawOutput = "Google Services disconnected. Please connect your Google account in Settings to enable Calendar and Gmail actions."
             )
         }
 

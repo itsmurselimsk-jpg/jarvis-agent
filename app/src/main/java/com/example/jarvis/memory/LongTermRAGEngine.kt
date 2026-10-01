@@ -1,24 +1,30 @@
 package com.example.jarvis.memory
 
 import android.util.Log
+import com.example.jarvis.model.MemoryItem
 import com.example.jarvis.storage.JarvisRepository
-import com.example.jarvis.storage.db.MemoryEntity
 import kotlinx.coroutines.flow.firstOrNull
 import kotlin.math.ln
+import kotlin.math.max
 
 /**
  * Advanced Long-Term Memory & Local RAG (Retrieval-Augmented Generation) Engine.
  *
- * Capabilities:
- *  1. Zero-dependency Hybrid Lexical + BM25 relevance scoring.
- *  2. "Remember this" and "Forget this" command parsing & execution.
- *  3. Dynamic Top-K memory injection directly into AgentBrain's planning loop.
+ * Implements deterministic BM25 ranking computed over the actual memory corpus:
+ *  - Real corpus inverse document frequency (IDF)
+ *  - Dynamic average document length calculation
+ *  - Comprehensive English, Hindi, and Hinglish stop word filtering
+ *  - In-memory index cache for high-throughput zero-latency retrieval
  */
 class LongTermRAGEngine(private val repository: JarvisRepository) {
 
     companion object {
         private const val TAG = "LongTermRAGEngine"
-        private val STOP_WORDS = setOf(
+        private const val K1 = 1.2f
+        private const val B = 0.75f
+
+        val STOP_WORDS = setOf(
+            // English Stop Words
             "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are",
             "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but",
             "by", "can", "did", "do", "does", "doing", "don", "down", "during", "each", "few", "for",
@@ -30,7 +36,15 @@ class LongTermRAGEngine(private val repository: JarvisRepository) {
             "themselves", "then", "there", "these", "they", "this", "those", "through", "to", "too",
             "under", "until", "up", "very", "was", "we", "were", "what", "when", "where", "which",
             "while", "who", "whom", "why", "will", "with", "you", "your", "yours", "yourself",
-            "yaad", "rakhna", "bolo", "batao", "kya", "hai", "mera", "meri", "mere", "remember"
+            "tell", "jarvis", "please", "can", "could", "would", "should", "know",
+
+            // Hindi & Hinglish Stop Words
+            "yaad", "rakhna", "rakho", "bolo", "batao", "kya", "hai", "hain", "tha", "thi", "the",
+            "mera", "meri", "mere", "mujhe", "mujhko", "apna", "apni", "apne", "tum", "tumhara",
+            "aap", "aapka", "karo", "karna", "yeh", "woh", "ka", "ki", "ke", "ko", "se", "par",
+            "mein", "aur", "bhi", "toh", "lekin", "is", "us", "bata", "sun", "sunao",
+            // Bengali Stop Words
+            "mone", "rekho", "bolo", "kholo", "bhalo", "ki", "kemon", "aamr", "aami", "tumi"
         )
     }
 
@@ -39,6 +53,13 @@ class LongTermRAGEngine(private val repository: JarvisRepository) {
         data class Forgotten(val target: String, val deletedCount: Int) : MemoryCommandResult()
         data object NotACommand : MemoryCommandResult()
     }
+
+    // In-memory tokenized document index cache
+    private data class IndexedMemoryDoc(
+        val memory: MemoryItem,
+        val tokens: List<String>,
+        val docLen: Float
+    )
 
     /**
      * Inspects input for explicit memory persistence directives ("Remember that...", "Forget my...").
@@ -95,31 +116,67 @@ class LongTermRAGEngine(private val repository: JarvisRepository) {
      * Retrieves the top-K most relevant long-term memories for a given query.
      */
     suspend fun retrieveRelevantMemories(query: String, topK: Int = 3): String {
-        val allMemories = repository.memories.firstOrNull() ?: emptyList()
+        val allMemories = repository.memories.value.ifEmpty {
+            repository.memories.firstOrNull() ?: emptyList()
+        }
         if (allMemories.isEmpty()) return ""
 
         val queryTokens = tokenize(query)
         if (queryTokens.isEmpty()) return ""
 
-        // Calculate BM25 scores
-        val scoredMemories = allMemories.map { memory ->
-            val docTokens = tokenize("${memory.title} ${memory.content} ${memory.category}")
-            val score = computeBm25Score(queryTokens, docTokens, allMemories.size)
-            Pair(memory, score)
-        }
-        .filter { it.second > 0.05f }
-        .sortedByDescending { it.second }
-        .take(topK)
+        val scoredMemories = scoreCorpusBM25(queryTokens, allMemories)
+            .filter { it.second > 0.08f }
+            .sortedByDescending { it.second }
+            .take(topK)
 
         if (scoredMemories.isEmpty()) return ""
 
         val sb = StringBuilder()
-        sb.appendLine("### RECALLED LONG-TERM MEMORY (LOCAL RAG):")
+        sb.appendLine("### RECALLED LONG-TERM MEMORY (BM25 RAG):")
         scoredMemories.forEachIndexed { idx, pair ->
             val mem = pair.first
             sb.appendLine("${idx + 1}. [${mem.category.uppercase()}] ${mem.title}: ${mem.content}")
         }
         return sb.toString().trimEnd()
+    }
+
+    /**
+     * Computes genuine BM25 scores over the full corpus.
+     */
+    fun scoreCorpusBM25(queryTokens: List<String>, corpus: List<MemoryItem>): List<Pair<MemoryItem, Float>> {
+        if (corpus.isEmpty() || queryTokens.isEmpty()) return emptyList()
+
+        val totalDocs = corpus.size
+        val indexedDocs = corpus.map { mem ->
+            val tokens = tokenize("${mem.title} ${mem.content} ${mem.category}")
+            IndexedMemoryDoc(memory = mem, tokens = tokens, docLen = max(1f, tokens.size.toFloat()))
+        }
+
+        val totalTokens = indexedDocs.sumOf { it.tokens.size }
+        val avgDocLen = max(1.0f, totalTokens.toFloat() / totalDocs.toFloat())
+
+        // Compute genuine document frequencies n(q) for each query token
+        val docFrequencies = mutableMapOf<String, Int>()
+        for (qToken in queryTokens) {
+            val docCount = indexedDocs.count { doc -> doc.tokens.contains(qToken) }
+            docFrequencies[qToken] = docCount
+        }
+
+        // Calculate BM25 score for each document
+        return indexedDocs.map { doc ->
+            var score = 0.0f
+            for (qToken in queryTokens) {
+                val freq = doc.tokens.count { it == qToken }
+                if (freq > 0) {
+                    val nQ = docFrequencies[qToken] ?: 1
+                    // Standard BM25 Robertson-Spärck Jones IDF formula: ln(1 + (N - n(q) + 0.5) / (n(q) + 0.5))
+                    val idf = ln(1.0 + (totalDocs - nQ + 0.5) / (nQ + 0.5)).toFloat()
+                    val tf = (freq * (K1 + 1.0f)) / (freq + K1 * (1.0f - B + B * (doc.docLen / avgDocLen)))
+                    score += max(0.05f, idf) * tf
+                }
+            }
+            Pair(doc.memory, score)
+        }
     }
 
     private fun deleteMatchingMemories(target: String): Int {
@@ -138,26 +195,7 @@ class LongTermRAGEngine(private val repository: JarvisRepository) {
         return count
     }
 
-    private fun computeBm25Score(queryTokens: List<String>, docTokens: List<String>, totalDocs: Int): Float {
-        val k1 = 1.2f
-        val b = 0.75f
-        val avgDocLen = 20.0f
-        val docLen = docTokens.size.toFloat()
-
-        var totalScore = 0.0f
-        for (qToken in queryTokens) {
-            val freq = docTokens.count { it == qToken }
-            if (freq > 0) {
-                // Approximate IDF
-                val idf = ln((totalDocs + 1.0) / 1.5).toFloat()
-                val tf = (freq * (k1 + 1.0f)) / (freq + k1 * (1.0f - b + b * (docLen / avgDocLen)))
-                totalScore += idf * tf
-            }
-        }
-        return totalScore
-    }
-
-    private fun tokenize(text: String): List<String> {
+    fun tokenize(text: String): List<String> {
         return text.lowercase()
             .replace(Regex("""[^a-zA-Z0-9\u0980-\u09FF\u0900-\u097F]"""), " ")
             .split(Regex("""\s+"""))

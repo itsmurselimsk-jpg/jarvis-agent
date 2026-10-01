@@ -130,7 +130,7 @@ class JarvisPluginSystemUnitTest {
 
         assertFalse(result.success)
         assertNotNull(result.error)
-        assertTrue(result.error!!.message.contains("credentials or OAuth token missing"))
+        assertTrue(result.error!!.message.contains("Google Services disconnected") || result.error!!.message.contains("credentials or OAuth token missing"))
     }
 
     // 5. HEALTH CHECK
